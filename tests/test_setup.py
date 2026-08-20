@@ -200,3 +200,20 @@ def test_startup_retry_waits_for_persisted_rate_limit(monkeypatch) -> None:
         assert hass.config_entries.forwarded
 
     asyncio.run(run_test())
+
+
+def test_setup_retries_inventory_after_kiln_is_claimed() -> None:
+    async def run_test() -> None:
+        session = FakeSession(FakeResponse([]), *_claimed_kiln_responses())
+        hass = FakeHomeAssistant(session)
+        entry = FakeConfigEntry()
+
+        with pytest.raises(FakeConfigEntryNotReady, match="No claimed"):
+            await integration.async_setup_entry(hass, entry)
+
+        assert await integration.async_setup_entry(hass, entry)
+        assert session.requests.count("https://kiln.bartinst.com/kilns/settings") == 2
+        assert entry.runtime_data.data
+        assert hass.config_entries.forwarded
+
+    asyncio.run(run_test())
