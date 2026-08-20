@@ -11,6 +11,15 @@ Read-only Home Assistant integration for Bartlett Genesis kiln controllers regis
 
 The integration polls every 30 seconds and treats controller data older than five minutes as offline. It does not expose remote start, stop, or programming controls.
 
+## Pairing and safety
+
+Claiming and pairing are different operations in KilnAid:
+
+- **Claiming** associates a controller with an account and is required for monitoring.
+- **Pairing** authorizes remote programming and stopping after a firing.
+
+This integration only reads monitoring data, so the controller does not need to be paired. Remote-control endpoints are intentionally not implemented.
+
 ## Prerequisites
 
 1. Create an account at [KilnAid](https://kilnaid.bartinst.com/).
