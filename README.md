@@ -2,6 +2,9 @@
 
 Read-only Home Assistant integration for Bartlett Genesis kiln controllers registered with KilnAid.
 
+> [!WARNING]
+> This is experimental, slop/vibe-coded software that has only been tested with a Bartlett Genesis 2.0. It is unofficial, is not affiliated with or supported by Bartlett Instrument Company, and must not be used as a kiln safety system. Always monitor and operate a kiln according to its manufacturer's safety instructions.
+
 ## Entities
 
 - Controller connectivity, mode, alarm, and error state
