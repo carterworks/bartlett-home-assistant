@@ -28,7 +28,7 @@ This integration only reads monitoring data, so the controller does not need to 
 
 ## Installation
 
-This repository is structured as a HACS custom integration. Once it is hosted on GitHub, add its URL to HACS as an **Integration** custom repository, install **Bartlett KilnAid**, and restart Home Assistant.
+Add `https://github.com/carterworks/bartlett-home-assistant` to HACS as an **Integration** custom repository, install **Bartlett KilnAid**, and restart Home Assistant.
 
 Then open **Settings > Devices & services > Add integration**, search for **Bartlett KilnAid**, and enter the KilnAid account credentials. The password is used only to obtain an authentication token and is not stored.
 
