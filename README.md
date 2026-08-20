@@ -12,7 +12,15 @@ Read-only Home Assistant integration for Bartlett Genesis kiln controllers regis
 - Program, segment, firing time, and hold time remaining
 - Total firing count and last cloud update
 
-The integration polls every 30 seconds and treats controller data older than five minutes as offline. It does not expose remote start, stop, or programming controls.
+The integration treats controller data older than five minutes as offline. It does not expose remote start, stop, or programming controls.
+
+## Cloud polling
+
+One coordinator fetches all claimed kilns for an account in a shared cloud request. Home Assistant schedules that request only while coordinator entities have subscribers.
+
+- Approximately every minute while any online kiln is firing, waiting for a delayed start, reporting an error, completing a firing, or in another active or transitional mode
+- Approximately every five minutes when every kiln is idle, not connected, or offline
+- After an HTTP 429 response, no sooner than the service's `Retry-After` delay, with a five-minute fallback when no valid delay is provided
 
 ## Pairing and safety
 
