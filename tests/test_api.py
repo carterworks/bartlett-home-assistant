@@ -8,6 +8,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import pytest
+
 # Load the pure API module without importing the Home Assistant integration runtime.
 package = ModuleType("custom_components.bartlett_kilnaid")
 package.__path__ = [
@@ -17,14 +19,21 @@ sys.modules[package.__name__] = package
 api = import_module("custom_components.bartlett_kilnaid.api")
 parse_kiln = api.parse_kiln
 BartlettApiClient = api.BartlettApiClient
+BartlettRateLimitError = api.BartlettRateLimitError
 
 
 class FakeResponse:
     """Minimal aiohttp response used by the API client tests."""
 
-    def __init__(self, payload: Any, status: int = 200) -> None:
+    def __init__(
+        self,
+        payload: Any,
+        status: int = 200,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.payload = payload
         self.status = status
+        self.headers = headers or {}
 
     async def __aenter__(self):
         return self
@@ -171,3 +180,25 @@ def test_client_handles_account_without_claimed_kilns() -> None:
 
     assert asyncio.run(client.async_get_kilns()) == {}
     assert len(session.requests) == 1
+
+
+def test_client_honors_rate_limit_retry_after() -> None:
+    session = FakeSession(FakeResponse({}, status=429, headers={"Retry-After": "137"}))
+    client = BartlettApiClient(session, "user@example.com", "test-token")
+
+    with pytest.raises(BartlettRateLimitError) as raised:
+        asyncio.run(client.async_get_kilns())
+
+    assert raised.value.retry_after == 137
+
+
+def test_client_uses_safe_fallback_for_invalid_retry_after() -> None:
+    session = FakeSession(
+        FakeResponse({}, status=429, headers={"Retry-After": "invalid"})
+    )
+    client = BartlettApiClient(session, "user@example.com", "test-token")
+
+    with pytest.raises(BartlettRateLimitError) as raised:
+        asyncio.run(client.async_get_kilns())
+
+    assert raised.value.retry_after == 300
