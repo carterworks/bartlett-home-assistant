@@ -104,6 +104,31 @@ def test_active_and_transitional_modes_use_one_minute_interval(mode: str) -> Non
     assert coordinator_module.poll_interval(kilns) == timedelta(minutes=1)
 
 
+def test_active_interval_starts_after_activity_is_detected() -> None:
+    class SequenceClient:
+        def __init__(self) -> None:
+            self.responses = [
+                {"GENERIC": _kiln("Idle")},
+                {"GENERIC": _kiln("Firing")},
+            ]
+
+        async def async_get_kilns(self):
+            return self.responses.pop(0)
+
+    async def run_test() -> None:
+        coordinator = coordinator_module.BartlettCoordinator(
+            FakeHomeAssistant(), FakeConfigEntry(), SequenceClient()
+        )
+
+        await coordinator._async_update_data()
+        assert coordinator.update_interval == timedelta(minutes=5)
+
+        await coordinator._async_update_data()
+        assert coordinator.update_interval == timedelta(minutes=1)
+
+    asyncio.run(run_test())
+
+
 def test_coordinator_passes_rate_limit_delay_to_update_failed() -> None:
     class RateLimitedClient:
         async def async_get_kilns(self):

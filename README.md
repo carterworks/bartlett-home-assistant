@@ -18,9 +18,10 @@ The integration treats controller data older than five minutes as offline. It do
 
 One coordinator fetches all claimed kilns for an account in a shared cloud request. Home Assistant schedules that request only while coordinator entities have subscribers.
 
-- Approximately every minute while any online kiln is firing, waiting for a delayed start, reporting an error, completing a firing, or in another active or transitional mode
+- Approximately every minute after an online kiln is detected firing, waiting for a delayed start, reporting an error, completing a firing, or in another active or transitional mode
 - Approximately every five minutes when every kiln is idle, not connected, or offline
-- After an HTTP 429 response, no sooner than the service's `Retry-After` delay, with a five-minute fallback when no valid delay is provided
+- An idle-to-active transition can therefore take nearly five minutes to detect; polling changes to the one-minute interval after detection
+- After an HTTP 429 response, according to a valid `Retry-After` delay bounded between one second and 24 hours, with a five-minute fallback when no valid delay is provided
 
 ## Pairing and safety
 
@@ -42,6 +43,8 @@ This integration only reads monitoring data, so the controller does not need to 
 Add `https://github.com/carterworks/bartlett-home-assistant` to HACS as an **Integration** custom repository, install **Bartlett KilnAid**, and restart Home Assistant.
 
 Then open **Settings > Devices & services > Add integration**, search for **Bartlett KilnAid**, and enter the KilnAid account credentials. The password is used only to obtain an authentication token and is not stored.
+
+At least one kiln must already be claimed. If none are claimed, the config entry remains in setup retry and checks inventory again on a later retry; claim a kiln and reload the entry to retry immediately.
 
 ## Local log server
 
