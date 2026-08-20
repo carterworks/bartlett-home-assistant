@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import get_running_loop, sleep
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -9,7 +10,12 @@ from typing import Any
 
 from aiohttp import ClientError, ClientResponse, ClientSession
 
-from .const import OFFLINE_AFTER, RATE_LIMIT_RETRY_AFTER
+from .const import (
+    MAX_RATE_LIMIT_RETRY_AFTER,
+    MIN_RATE_LIMIT_RETRY_AFTER,
+    OFFLINE_AFTER,
+    RATE_LIMIT_RETRY_AFTER,
+)
 
 LOGIN_URL = "https://bartinst-user-service-prod.herokuapp.com/login"
 KILN_API_URL = "https://kiln.bartinst.com"
@@ -29,6 +35,22 @@ class BartlettRateLimitError(BartlettApiError):
     def __init__(self, retry_after: float) -> None:
         super().__init__("KilnAid rate limit exceeded")
         self.retry_after = retry_after
+
+
+@dataclass(slots=True)
+class RateLimitGate:
+    """Prevent requests until a shared monotonic deadline."""
+
+    deadline: float = 0
+
+    async def async_wait(self) -> None:
+        """Wait until another request is permitted."""
+        while (delay := self.deadline - get_running_loop().time()) > 0:
+            await sleep(delay)
+
+    def defer(self, delay: float) -> None:
+        """Extend the deadline by a delay in seconds."""
+        self.deadline = max(self.deadline, get_running_loop().time() + delay)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,10 +87,17 @@ class KilnData:
 class BartlettApiClient:
     """Read kiln data from Bartlett's cloud services."""
 
-    def __init__(self, session: ClientSession, email: str, token: str) -> None:
+    def __init__(
+        self,
+        session: ClientSession,
+        email: str,
+        token: str,
+        rate_limit_gate: RateLimitGate | None = None,
+    ) -> None:
         self._session = session
         self.email = email
         self.token = token
+        self._rate_limit_gate = rate_limit_gate or RateLimitGate()
         self._kiln_metadata: dict[str, dict[str, Any]] | None = None
 
     @classmethod
@@ -161,6 +190,7 @@ class BartlettApiClient:
         self, method: str, path: str, *, json: dict[str, Any] | None = None
     ) -> Any:
         """Make an authenticated kiln API request."""
+        await self._rate_limit_gate.async_wait()
         try:
             async with self._session.request(
                 method,
@@ -179,7 +209,9 @@ class BartlettApiClient:
                     raise BartlettAuthError("KilnAid authentication expired")
                 if response.status == 429:
                     await response.read()
-                    raise BartlettRateLimitError(_retry_after(response))
+                    retry_after = _retry_after(response)
+                    self._rate_limit_gate.defer(retry_after)
+                    raise BartlettRateLimitError(retry_after)
                 data = await _response_json(response)
         except TimeoutError as err:
             raise BartlettApiError("KilnAid request timed out") from err
@@ -209,10 +241,11 @@ def _retry_after(response: ClientResponse) -> float:
     if value is None:
         return RATE_LIMIT_RETRY_AFTER
 
-    try:
-        return max(0.0, float(value))
-    except ValueError:
-        pass
+    if value.isascii() and value.isdecimal():
+        try:
+            return _bounded_retry_after(int(value))
+        except ValueError:
+            return RATE_LIMIT_RETRY_AFTER
 
     try:
         retry_at = parsedate_to_datetime(value)
@@ -220,7 +253,15 @@ def _retry_after(response: ClientResponse) -> float:
         return RATE_LIMIT_RETRY_AFTER
     if retry_at.tzinfo is None:
         retry_at = retry_at.replace(tzinfo=UTC)
-    return max(0.0, (retry_at - datetime.now(UTC)).total_seconds())
+    return _bounded_retry_after((retry_at - datetime.now(UTC)).total_seconds())
+
+
+def _bounded_retry_after(delay: float) -> float:
+    """Keep a server-provided delay within a safe scheduling range."""
+    return min(
+        MAX_RATE_LIMIT_RETRY_AFTER,
+        max(MIN_RATE_LIMIT_RETRY_AFTER, delay),
+    )
 
 
 def parse_kiln(status: dict[str, Any], metadata: dict[str, Any]) -> KilnData:

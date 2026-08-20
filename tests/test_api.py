@@ -2,7 +2,8 @@
 
 import asyncio
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from importlib import import_module
 from pathlib import Path
 from types import ModuleType
@@ -202,3 +203,43 @@ def test_client_uses_safe_fallback_for_invalid_retry_after() -> None:
         asyncio.run(client.async_get_kilns())
 
     assert raised.value.retry_after == 300
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("0", 1),
+        ("-1", 300),
+        ("1.5", 300),
+        ("nan", 300),
+        ("inf", 300),
+        ("999999999999999999999999999999999999", 86400),
+    ],
+)
+def test_retry_after_delay_seconds_policy(value: str, expected: float) -> None:
+    response = FakeResponse({}, headers={"Retry-After": value})
+
+    assert api._retry_after(response) == expected
+
+
+def test_retry_after_missing_header_uses_fallback() -> None:
+    assert api._retry_after(FakeResponse({})) == 300
+
+
+def test_retry_after_past_date_uses_positive_floor() -> None:
+    value = format_datetime(datetime.now(UTC) - timedelta(minutes=1), usegmt=True)
+
+    assert api._retry_after(FakeResponse({}, headers={"Retry-After": value})) == 1
+
+
+def test_retry_after_future_date_is_honored() -> None:
+    value = format_datetime(datetime.now(UTC) + timedelta(minutes=2), usegmt=True)
+    delay = api._retry_after(FakeResponse({}, headers={"Retry-After": value}))
+
+    assert 118 <= delay <= 120
+
+
+def test_retry_after_distant_future_date_is_capped() -> None:
+    value = format_datetime(datetime.now(UTC) + timedelta(days=2), usegmt=True)
+
+    assert api._retry_after(FakeResponse({}, headers={"Retry-After": value})) == 86400

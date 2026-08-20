@@ -7,8 +7,8 @@ from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import BartlettApiClient
-from .const import CONF_TOKEN, PLATFORMS
+from .api import BartlettApiClient, RateLimitGate
+from .const import CONF_TOKEN, DOMAIN, PLATFORMS
 from .coordinator import BartlettCoordinator
 
 type BartlettConfigEntry = ConfigEntry[BartlettCoordinator]
@@ -16,10 +16,12 @@ type BartlettConfigEntry = ConfigEntry[BartlettCoordinator]
 
 async def async_setup_entry(hass: HomeAssistant, entry: BartlettConfigEntry) -> bool:
     """Set up Bartlett KilnAid from a config entry."""
+    rate_limit_gates: dict[str, RateLimitGate] = hass.data.setdefault(DOMAIN, {})
     client = BartlettApiClient(
         async_get_clientsession(hass),
         entry.data[CONF_EMAIL],
         entry.data[CONF_TOKEN],
+        rate_limit_gates.setdefault(entry.entry_id, RateLimitGate()),
     )
     coordinator = BartlettCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
@@ -30,4 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BartlettConfigEntry) -> 
 
 async def async_unload_entry(hass: HomeAssistant, entry: BartlettConfigEntry) -> bool:
     """Unload a Bartlett KilnAid config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
+    hass.data[DOMAIN].pop(entry.entry_id, None)
+    return True
