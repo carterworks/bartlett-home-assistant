@@ -36,6 +36,6 @@ Enable it with `Menu > Configuration > Export Log File`. It exposes up to ten fi
 
 ## Status
 
-This integration is based on the request flow used by KilnAid 5.0.13 and has been validated against a claimed Genesis 2 controller running firmware `LT4-4.22.0`.
+This integration is based on the request flow used by KilnAid and has been validated against a claimed Bartlett Genesis controller.
 
 Kiln inventory is loaded when the integration starts. Reload the integration after claiming or unclaiming a controller.

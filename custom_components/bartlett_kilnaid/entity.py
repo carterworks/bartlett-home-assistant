@@ -31,7 +31,7 @@ class BartlettEntity(CoordinatorEntity[BartlettCoordinator]):
             identifiers={(DOMAIN, self.serial)},
             name=kiln.name,
             manufacturer="Bartlett Instrument Company",
-            model="Genesis 2",
+            model="Genesis",
             serial_number=self.serial,
             sw_version=kiln.firmware,
             configuration_url="https://kilnaid.bartinst.com/",

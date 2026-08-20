@@ -35,7 +35,7 @@ def test_parse_single_zone_kiln() -> None:
             "serialNumber": "GEN2-123",
             "externalId": "kiln-id",
             "name": "Studio Kiln",
-            "firmwareVersion": "LT4-4.22.0",
+            "firmwareVersion": "1.2.3",
             "numFirings": 5,
         },
     )
