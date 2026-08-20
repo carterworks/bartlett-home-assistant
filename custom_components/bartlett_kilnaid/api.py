@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 from aiohttp import ClientError, ClientResponse, ClientSession
 
-from .const import OFFLINE_AFTER
+from .const import OFFLINE_AFTER, RATE_LIMIT_RETRY_AFTER
 
 LOGIN_URL = "https://bartinst-user-service-prod.herokuapp.com/login"
 KILN_API_URL = "https://kiln.bartinst.com"
@@ -20,6 +21,14 @@ class BartlettApiError(Exception):
 
 class BartlettAuthError(BartlettApiError):
     """Bartlett authentication failed."""
+
+
+class BartlettRateLimitError(BartlettApiError):
+    """Bartlett rejected a request because of rate limiting."""
+
+    def __init__(self, retry_after: float) -> None:
+        super().__init__("KilnAid rate limit exceeded")
+        self.retry_after = retry_after
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +85,9 @@ class BartlettApiClient:
                 if response.status in (400, 401, 403):
                     await response.read()
                     raise BartlettAuthError("Invalid KilnAid email or password")
+                if response.status == 429:
+                    await response.read()
+                    raise BartlettRateLimitError(_retry_after(response))
                 data = await _response_json(response)
         except TimeoutError as err:
             raise BartlettApiError("KilnAid login timed out") from err
@@ -165,6 +177,9 @@ class BartlettApiClient:
                 if response.status in (401, 403):
                     await response.read()
                     raise BartlettAuthError("KilnAid authentication expired")
+                if response.status == 429:
+                    await response.read()
+                    raise BartlettRateLimitError(_retry_after(response))
                 data = await _response_json(response)
         except TimeoutError as err:
             raise BartlettApiError("KilnAid request timed out") from err
@@ -186,6 +201,26 @@ async def _response_json(response: ClientResponse) -> Any:
         return await response.json(content_type=None)
     except (ValueError, TypeError) as err:
         raise BartlettApiError("KilnAid returned a non-JSON response") from err
+
+
+def _retry_after(response: ClientResponse) -> float:
+    """Return Retry-After as a delay in seconds."""
+    value = response.headers.get("Retry-After")
+    if value is None:
+        return RATE_LIMIT_RETRY_AFTER
+
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+
+    try:
+        retry_at = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        return RATE_LIMIT_RETRY_AFTER
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=UTC)
+    return max(0.0, (retry_at - datetime.now(UTC)).total_seconds())
 
 
 def parse_kiln(status: dict[str, Any], metadata: dict[str, Any]) -> KilnData:
