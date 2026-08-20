@@ -1,0 +1,29 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This KilnAid account is already configured",
+      "reauth_successful": "KilnAid reauthentication was successful"
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to KilnAid",
+      "invalid_auth": "Invalid email or password"
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        },
+        "description": "Enter the KilnAid password for {email}",
+        "title": "Reauthenticate KilnAid"
+      },
+      "user": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Sign in with the account used by the Bartlett KilnAid app. The password is exchanged for a token and is not stored.",
+        "title": "Connect to Bartlett KilnAid"
+      }
+    }
+  }
+}

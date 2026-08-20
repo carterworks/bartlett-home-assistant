@@ -1,0 +1,23 @@
+[project]
+name = "bartlett-home-assistant"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+  "aiohttp>=3.11",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.12",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
